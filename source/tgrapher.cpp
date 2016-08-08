@@ -19,27 +19,51 @@
 #include "TCanvas.h"
 #include "TGraphErrors.h"
 #include "TApplication.h"
-#include "TSystem.h"
 #include "TCutG.h"
 
 struct data_gate{
 	std::string name;
-	double low, high;
 	double value;
 	double *ptr;
+	bool use;
 	TBranch *data_b;
 	
-	data_gate(){ 
-		name = ""; low = 0.0; high = 0.0; 
+	std::vector<double> low;
+	std::vector<double> high;
+	
+	data_gate() : name(""), ptr(&value), use(false) { 
 	}
 	
-	data_gate(std::string name_, double low_, double high_){ 
-		name = name_; low = low_; high = high_; 
-		ptr = &value;
+	data_gate(std::string name_) : name(name_), ptr(&value), use(false) { 
+	}
+	
+	bool add(const double &low_, const double &high_){
+		if(low_ > high_) return false;
+		low.push_back(low_);
+		high.push_back(high_);
+		return true;
 	}
 	
 	bool is_in_range(){ 
-		return (*ptr >= low && *ptr <= high)?true:false; 
+		if(!use) return false;
+		std::vector<double>::iterator iter1 = low.begin();
+		std::vector<double>::iterator iter2 = high.begin();
+		for(; iter1 != low.end() && iter2 != high.end(); iter1++, iter2++){
+			if(*ptr >= *iter1 && *ptr <= *iter2) return true;
+		}
+		return false;
+	}
+	
+	std::string getstr(){
+		std::stringstream stream;
+		std::vector<double>::iterator iter1 = low.begin();
+		std::vector<double>::iterator iter2 = high.begin();
+		while(iter1 != low.end() && iter2 != high.end()){
+			stream << "[" << *iter1 << ", " << *iter2 << "]";
+			if(++iter1 != low.end() && ++iter2 != high.end()) // Add a union symbol.
+				stream << " U ";
+		}
+		return stream.str();
 	}
 };
 
@@ -112,7 +136,19 @@ int main(int argc, char* argv[]){
 				help(argv[0]);
 				return 1;
 			}
-			gates.push_back(data_gate(std::string(argv[index+1]), atof(argv[index+2]), atof(argv[index+3])));
+			bool found_gate = false;
+			std::string gate_name = std::string(argv[index+1]);
+			for(std::vector<data_gate>::iterator iter = gates.begin(); iter != gates.end(); iter++){ // Search for pre-existing gates on this branch.
+				if(gate_name == iter->name){
+					iter->add(atof(argv[index+2]), atof(argv[index+3]));
+					found_gate = true;
+				}
+			}
+			if(!found_gate){ // Found no pre-existing gates.
+				data_gate temp_gate(gate_name);
+				temp_gate.add(atof(argv[index+2]), atof(argv[index+3]));
+				gates.push_back(temp_gate);
+			}
 			index += 3;
 		}
 		else if(strcmp(argv[index], "--opt") == 0){
@@ -148,20 +184,6 @@ int main(int argc, char* argv[]){
 		std::cout << " Error! No branch name specified for y-axis\n";
 		return 1;
 	}
-
-	// Print some information to the screen.
-	std::cout << " Graphing " << names[1] << " vs. " << names[0] << std::endl;
-	for(std::vector<data_gate>::iterator iter = gates.begin(); iter != gates.end(); iter++){
-		std::cout << "  For " << iter->name << " in range [" << iter->low << ", " << iter->high << "]\n";
-	}
-	if(use_xerr){ std::cout << "  Using " << names[2] << " as x-axis errors\n"; }
-	if(use_yerr){ std::cout << "  Using " << names[3] << " as y-axis errors\n"; }
-	
-	TApplication* rootapp = NULL;
-	gSystem->Load("libTree");
-	
-	if(!batch_mode)
-		rootapp = new TApplication("rootapp", 0, NULL);
 
 	// Load the input file.
 	TFile *file = new TFile(argv[1], "READ");
@@ -233,39 +255,38 @@ int main(int argc, char* argv[]){
 			iter->data_b = branches[3];
 		}
 		else{ // The gate is a branch which is not currently in use.
-			bool found_prev_branch = false;
-		
-			// Check that the branch isn't already in use by one of the previously
-			// loaded gates. This makes it possible to perform unions.
-			for(std::vector<data_gate>::iterator iter2 = gates.begin(); iter2 != iter; iter++){
-				if(iter->name == iter2->name){
-					iter->ptr = &iter2->value;
-					iter->data_b = iter2->data_b;
-					found_prev_branch = true;
-					break;
-				}
-			}
-		
-			if(!found_prev_branch){ // The gate branch wasn't already loaded. Load it now.
-				tree->SetBranchAddress(iter->name.c_str(), &iter->value, &iter->data_b);
+			tree->SetBranchAddress(iter->name.c_str(), &iter->value, &iter->data_b);
 			
-				// Check that the branch was loaded properly.
-				if(!iter->data_b){
-					std::cout << " Warning! Failed to load gate branch '" << iter->name << "'.\n";
-				}
-				
-				// Set the gate pointer.
-				iter->ptr = &iter->value;
+			// Set the gate pointer.
+			iter->ptr = &iter->value;
+			
+			// Check that the branch was loaded properly.
+			if(!iter->data_b){ // Mark this gate as do-not-use.
+				std::cout << " Warning! Failed to load gate branch '" << iter->name << "'.\n";
+				iter->use = false;
+			}
+			else{ // Mark this as a good gate.
+				iter->use = true;
 			}
 		}
 	}
 
+	// Print some information to the screen.
+	std::cout << " Graphing " << names[1] << " vs. " << names[0] << std::endl;
+	for(std::vector<data_gate>::iterator iter = gates.begin(); iter != gates.end(); iter++){
+		if(!iter->use) continue;
+		std::cout << "  For " << iter->name << " in range " << iter->getstr() << std::endl;
+	}
+	if(use_xerr){ std::cout << "  Using " << names[2] << " as x-axis errors\n"; }
+	if(use_yerr){ std::cout << "  Using " << names[3] << " as y-axis errors\n"; }
+	
 	std::vector<double> xval, yval;
 	std::vector<double> xerr, yerr;
 
 	bool valid = true;
 
 	// Process all the entries in the tree.
+	unsigned int valid_counts = 0;
 	std::cout << "  Processing " << tree->GetEntries() << " entries\n";
 	for(unsigned int i = 0; i < tree->GetEntries(); i++){
 		tree->GetEntry(i);
@@ -290,8 +311,14 @@ int main(int argc, char* argv[]){
 				xerr.push_back(*valptrs[2]);
 				yerr.push_back(*valptrs[3]);
 			}
+			
+			valid_counts++;
 		}
 	}
+
+	// Check if the pair is within one of the gates (if there are any).
+	if(!gates.empty())
+		std::cout << " Done! Found " << valid_counts << " valid entries in tree.\n";
 
 	// Initialize the graph.
 	TGraphErrors *graph;
@@ -299,8 +326,10 @@ int main(int argc, char* argv[]){
 	else{ graph = new TGraphErrors(xval.size(), xval.data(), yval.data(), xerr.data(), yerr.data()); }
 	
 	// Initialize the canvas.
+	TApplication* rootapp = NULL;
 	TCanvas *can = NULL;
 	if(!batch_mode){
+		rootapp = new TApplication("rootapp", 0, NULL);
 		can = new TCanvas("can");
 		can->cd();
 	}
