@@ -238,10 +238,12 @@ int main(int argc, char* argv[]){
 			// Check that the branch isn't already in use by one of the previously
 			// loaded gates. This makes it possible to perform unions.
 			for(std::vector<data_gate>::iterator iter2 = gates.begin(); iter2 != iter; iter++){
-				iter->ptr = iter2->ptr;
-				iter->data_b = iter2->data_b;
-				found_prev_branch = true;
-				break;
+				if(iter->name == iter2->name){
+					iter->ptr = &iter2->value;
+					iter->data_b = iter2->data_b;
+					found_prev_branch = true;
+					break;
+				}
 			}
 		
 			if(!found_prev_branch){ // The gate branch wasn't already loaded. Load it now.
@@ -251,6 +253,9 @@ int main(int argc, char* argv[]){
 				if(!iter->data_b){
 					std::cout << " Warning! Failed to load gate branch '" << iter->name << "'.\n";
 				}
+				
+				// Set the gate pointer.
+				iter->ptr = &iter->value;
 			}
 		}
 	}
