@@ -67,6 +67,42 @@ struct data_gate{
 	}
 };
 
+void tikz(const std::vector<double> &x, const std::vector<double> &y, const std::vector<double> &xerr,  const std::vector<double> &yerr){
+	if(x.empty() || y.empty() || (x.size() != y.size())) return;
+	
+	bool useXerror = (!xerr.empty() && (x.size() == xerr.size()));
+	bool useYerror = (!yerr.empty() && (y.size() == yerr.size()));
+
+	// Print the latex header.
+	std::cout << "\\begin{tikzpicture}\n";
+	std::cout << "\\begin{axis}\n";
+	std::cout << "\\addplot+[only marks";
+	if(useXerror && useYerror)
+		std::cout << ",error bars,x dir=both,x explicit,y dir=both,y explicit";
+	else if(useXerror)
+		std::cout << ",error bars,x dir=both,x explicit";
+	else if(useYerror)
+		std::cout << ",error bars,y dir=both,y explicit";
+	std::cout << "] coordinates {\n";
+
+	// Print the coordinates.
+	for(size_t i = 0; i < x.size(); i++){
+		std::cout << "\t(" << x[i] << "," << y[i] << ")";
+		if(useXerror && useYerror)
+			std::cout << " +- (" << xerr[i] << "," << yerr[i] << ")";
+		else if(useXerror)
+			std::cout << " +- (" << xerr[i] << ",0)";
+		else if(useYerror)
+			std::cout << " +- (0," << yerr[i] << ")";
+		std::cout << std::endl;
+	}	
+
+	// Print the latex footer.
+	std::cout << "};\n";
+	std::cout << "\\end{axis}\n";
+	std::cout << "\\end{tikzpicture}\n";
+}
+
 void help(char * prog_name_){
 	std::cout << "  SYNTAX: " << prog_name_ << " <filename> <treename> <x_branch> <y_branch> [options]\n";
 	std::cout << "   Available options:\n";
@@ -77,6 +113,7 @@ void help(char * prog_name_){
 	std::cout << "    --opt <str>                | Specify the TGraph draw option (default='AP').\n";
 	std::cout << "    --cut                      | Draw a TCutG around the data and print entries which are within it.\n";
 	std::cout << "    --batch                    | Run in batch mode. i.e. do not open a window for plotting.\n";
+	std::cout << "    --tikz                     | Output a tikz plot.\n";
 }
 
 int main(int argc, char* argv[]){
@@ -97,6 +134,7 @@ int main(int argc, char* argv[]){
 	bool use_xerr = false;
 	bool use_yerr = false;
 	bool use_tcut = false;
+	bool tikzMode = false;
 	std::vector<data_gate> gates;
 	std::string save_name = "";
 	std::string graph_name = "";
@@ -164,6 +202,9 @@ int main(int argc, char* argv[]){
 		}
 		else if(strcmp(argv[index], "--batch") == 0){
 			batch_mode = true;
+		}
+		else if(strcmp(argv[index], "--tikz") == 0){
+			tikzMode = true;
 		}
 		else{ 
 			std::cout << " Error! Unrecognized option '" << argv[index] << "'!\n";
@@ -307,10 +348,8 @@ int main(int argc, char* argv[]){
 			xval.push_back(*valptrs[0]);
 			yval.push_back(*valptrs[1]);
 
-			if(use_xerr || use_yerr){ 
-				xerr.push_back(*valptrs[2]);
-				yerr.push_back(*valptrs[3]);
-			}
+			if(use_xerr) xerr.push_back(*valptrs[2]);
+			if(use_yerr) yerr.push_back(*valptrs[3]);
 			
 			valid_counts++;
 		}
@@ -319,6 +358,11 @@ int main(int argc, char* argv[]){
 	// Check if the pair is within one of the gates (if there are any).
 	if(!gates.empty())
 		std::cout << " Done! Found " << valid_counts << " valid entries in tree.\n";
+
+	if(tikzMode){
+		tikz(xval, yval, xerr, yerr);
+		return 0;
+	}
 
 	// Initialize the graph.
 	TGraphErrors *graph;
