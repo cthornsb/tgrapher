@@ -129,7 +129,7 @@ int main(int argc, char* argv[]){
 	}
 
 	// Branch name array.
-	std::string names[4] = {std::string(argv[3]), std::string(argv[4]), "", ""};
+	std::string names[4] = {std::string(argv[2]), std::string(argv[3]), "", ""};
 
 	bool batch_mode = false;
 	bool use_xerr = false;
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]){
 	std::string save_name = "";
 	std::string graph_name = "";
 	std::string draw_opt = "AP";
-	int index = 5;
+	int index = 4;
 	while(index < argc){
 		if(strcmp(argv[index], "--xerror") == 0){
 			if(index + 1 >= argc){
@@ -385,9 +385,7 @@ int main(int argc, char* argv[]){
 	// Set graph attributes and draw to the screen.
 	graph->SetTitle((names[1] + " vs. " + names[0]).c_str());
 	graph->GetXaxis()->SetTitle(names[0].c_str());
-	graph->GetXaxis()->SetTitleOffset(1.2);
 	graph->GetYaxis()->SetTitle(names[1].c_str());
-	graph->GetYaxis()->SetTitleOffset(1.2);
 	graph->SetMarkerColor(4);
 	graph->SetMarkerStyle(21);
 	
