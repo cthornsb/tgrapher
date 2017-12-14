@@ -104,7 +104,7 @@ void tikz(const std::vector<double> &x, const std::vector<double> &y, const std:
 }
 
 void help(char * prog_name_){
-	std::cout << "  SYNTAX: " << prog_name_ << " <filename> <treename> <x_branch> <y_branch> [options]\n";
+	std::cout << "  SYNTAX: " << prog_name_ << " <filename> <x_branch> <y_branch> [options]\n";
 	std::cout << "   Available options:\n";
 	std::cout << "    --xerror <name>            | Supply the name of the branch containing the x-axis errors.\n";
 	std::cout << "    --yerror <name>            | Supply the name of the branch containing the y-axis errors.\n";
@@ -114,6 +114,7 @@ void help(char * prog_name_){
 	std::cout << "    --cut                      | Draw a TCutG around the data and print entries which are within it.\n";
 	std::cout << "    --batch                    | Run in batch mode. i.e. do not open a window for plotting.\n";
 	std::cout << "    --tikz                     | Output a tikz plot.\n";
+	std::cout << "    --raw                      | Read values from an ascii file.\n";
 }
 
 int main(int argc, char* argv[]){
@@ -121,8 +122,8 @@ int main(int argc, char* argv[]){
 		help(argv[0]);
 		return 1;
 	}
-	else if(argc < 5){
-		std::cout << " Error: Invalid number of arguments to " << argv[0] << ". Expected 4, received " << argc-1 << ".\n";
+	else if(argc < 4){
+		std::cout << " Error: Invalid number of arguments to " << argv[0] << ". Expected 3, received " << argc-1 << ".\n";
 		help(argv[0]);
 		return 1;
 	}
@@ -135,6 +136,7 @@ int main(int argc, char* argv[]){
 	bool use_yerr = false;
 	bool use_tcut = false;
 	bool tikzMode = false;
+	//bool rawMode = false;
 	std::vector<data_gate> gates;
 	std::string save_name = "";
 	std::string graph_name = "";
@@ -206,6 +208,9 @@ int main(int argc, char* argv[]){
 		else if(strcmp(argv[index], "--tikz") == 0){
 			tikzMode = true;
 		}
+		/*else if(strcmp(argv[index], "--raw") == 0){
+			rawMode = true;
+		}*/
 		else{ 
 			std::cout << " Error! Unrecognized option '" << argv[index] << "'!\n";
 			help(argv[0]);
@@ -234,13 +239,12 @@ int main(int argc, char* argv[]){
 	}
 	
 	// Load the input tree.
-	TTree *tree = (TTree*)file->Get(argv[2]);
+	TTree *tree = (TTree*)file->Get("data");
 	if(!tree){
 		std::cout << " Error! Failed to load input tree.\n";
 		file->Close();
 		return 1;
 	}
-	//tree->SetMakeClass(1);
 	
 	double values[4] = {0.0, 0.0, 0.0, 0.0};
 	double *valptrs[4] = {&values[0], &values[1],
