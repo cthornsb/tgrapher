@@ -1,1 +1,4 @@
-tgrapher
+*.a
+*.o
+*.dat
+*.root

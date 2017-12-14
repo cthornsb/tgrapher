@@ -2,53 +2,75 @@
 
 # Installer for tgrapher
 # Cory R. Thornsberry
-# May 19th, 2016
+# updated: Nov. 24th, 2016
 
 #####################################################################
 
-COMPILER = g++
+# Set the binary install directory.
+INSTALL_DIR = $(HOME)/bin
 
-CFLAGS = -Wall -O3 -Iinclude
-RFLAGS = -Wall -O3 `root-config --cflags` -Iinclude
-LDLIBS = `root-config --libs`
-ROOT_INC = `root-config --incdir`
+#####################################################################
 
+CC = g++
+
+#CFLAGS = -g -fPIC -Wall -std=c++0x `root-config --cflags` -Iinclude
+CFLAGS = -fPIC -Wall -O3 -std=c++0x `root-config --cflags` -Iinclude
+LDLIBS = -lstdc++ `root-config --libs`
+LDFLAGS = `root-config --glibs`
+
+# Directories
 TOP_LEVEL = $(shell pwd)
-SOURCE_DIR = $(shell pwd)/source
+INCLUDE_DIR = $(TOP_LEVEL)/include
+SOURCE_DIR = $(TOP_LEVEL)/source
+EXEC_DIR = $(TOP_LEVEL)/exec
 
-INSTALL_DIR = ~/bin
+# Tools
+ALL_TOOLS = tgrapher
+EXE_NAMES = $(addprefix $(EXEC_DIR)/, $(addsuffix .a, $(ALL_TOOLS)))
+INSTALLED = $(addprefix $(INSTALL_DIR)/, $(ALL_TOOLS))
 
-# Main executable
-MAIN_SRC = $(SOURCE_DIR)/tgrapher.cpp
+# List of directories to generate if they do not exist.
+DIRECTORIES = $(EXEC_DIR)
 
-EXECUTABLE = tgrapher
+#####################################################################
+
+all: $(DIRECTORIES) $(EXE_NAMES)
+#	Create all directories, make all objects, and link executable
+
+.PHONY: $(ALL_TOOLS) $(INSTALLED) $(DIRECTORIES)
+
+#####################################################################
+
+$(DIRECTORIES): 
+#	Make the default configuration directory
+	@if [ ! -d $@ ]; then \
+		echo "Making directory: "$@; \
+		mkdir -p $@; \
+	fi
+
+#####################################################################
+
+$(EXEC_DIR)/%.a: $(SOURCE_DIR)/%.cpp
+#	Compile C++ source files
+	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
+
+#####################################################################
+
+$(ALL_TOOLS):
+	@echo " Installing "$(INSTALL_DIR)/$@
+	@rm -f $(INSTALL_DIR)/$@
+	@ln -s $(EXEC_DIR)/$@.a $(INSTALL_DIR)/$@
+
+install: all $(ALL_TOOLS)
+	@echo "Finished installing tools to "$(INSTALL_DIR)
 
 ########################################################################
 
-$(EXECUTABLE): $(MAIN_SRC)
-#	Link the executable
-	$(COMPILER) $(RFLAGS) $(MAIN_SRC) -o $@ $(LDLIBS)
-	@echo " Done making "$(EXECUTABLE)
+$(INSTALLED):
+	@rm -f $@
 
-########################################################################
+uninstall: $(INSTALLED)
+	@echo "Finished uninstalling";
 
-.PHONY: install uninstall clean
-
-#####################################################################
-
-install:
-#	Uninstall executable to install directory.
-	@echo "Installing to "$(INSTALL_DIR)
-	@ln -s -f $(TOP_LEVEL)/$(EXECUTABLE) $(INSTALL_DIR)/tgrapher
-
-#####################################################################
-
-uninstall:
-#	Uninstall executable from install directory.
-	@echo "Uninstalling from "$(INSTALL_DIR)
-	@rm -f $(INSTALL_DIR)/tgrapher
-
-#####################################################################
-
-clean: 
-	@rm -f $(EXECUTABLE)
+clean: uninstall
+	@rm -f $(EXE_NAMES)
